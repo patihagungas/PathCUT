@@ -161,6 +161,7 @@ class MaxRectsEngine:
         parts: list[Part],
         sheets: list[Sheet],
         options: NestOptions,
+        on_progress: object = None,
     ) -> list[Layout]:
         """Nest parts onto sheets using MaxRects BSSF."""
         rng = random.Random(options.seed)

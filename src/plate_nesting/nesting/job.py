@@ -6,6 +6,7 @@ collects remnants, and reports per-sheet weight.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from plate_nesting.cutting.common_cut import detect_common_cuts
@@ -139,6 +140,7 @@ def nest_job(
     parts: list[Part],
     inventory: SheetInventory | None = None,
     options: NestOptions | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> JobResult:
     """Run a complete nesting job.
 
@@ -149,24 +151,37 @@ def nest_job(
         parts: All parts to nest.
         inventory: Sheet inventory. Defaults to standard sizes.
         options: Nesting options.
+        on_progress: Optional callback for stage updates.
 
     Returns:
         JobResult with per-sheet reports and remnants.
     """
+    def _emit(msg: str) -> None:
+        if on_progress:
+            on_progress(msg)
+
     if inventory is None:
         inventory = SheetInventory.default()
     if options is None:
         options = NestOptions()
 
     # Group parts by grade+thickness
+    total_parts = sum(p.qty for p in parts)
     groups: dict[tuple[str, float], list[Part]] = {}
     for part in parts:
         key = (part.grade, part.thickness)
         groups.setdefault(key, []).append(part)
 
-    result = JobResult()
+    _emit(f"Grouped {total_parts} parts into {len(groups)} material group(s)")
 
-    for (grade, thickness), group_parts in sorted(groups.items()):
+    result = JobResult()
+    group_list = sorted(groups.items())
+
+    for gi, ((grade, thickness), group_parts) in enumerate(group_list, 1):
+        group_qty = sum(p.qty for p in group_parts)
+        label = f"{grade} {thickness:g}mm" if grade else f"{thickness:g}mm"
+        _emit(f"Optimizing group {gi}/{len(group_list)}: {label} ({group_qty} parts)")
+
         available = inventory.sheets_for_group(grade, thickness)
         if not available:
             # Fallback: use default 6000x2500
@@ -184,13 +199,23 @@ def nest_job(
         grain = available[0].grain
         group_options = _grain_options(options, grain)
 
-        layouts = nest(group_parts, available, group_options)
+        layouts = nest(group_parts, available, group_options, on_progress=on_progress)
+
+        # Determine which parts were placed vs skipped (too large)
+        placed_names: set[str] = set()
+        for layout in layouts:
+            for pp in layout.placements:
+                placed_names.add(pp.part.name)
+        for part in group_parts:
+            if part.name not in placed_names:
+                result.unplaced.append(part)
 
         # Detect common cuts if enabled and thickness within threshold
         if (
             options.common_cuts
             and thickness <= options.common_cut_max_thickness
         ):
+            _emit(f"Detecting common cuts for group {gi}/{len(group_list)}")
             for layout in layouts:
                 layout.common_cuts = detect_common_cuts(
                     layout, options.spacing
@@ -220,4 +245,5 @@ def nest_job(
             if remnant:
                 result.remnants.append(remnant)
 
+    _emit("Finalizing results")
     return result

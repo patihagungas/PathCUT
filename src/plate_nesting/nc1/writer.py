@@ -60,7 +60,7 @@ def write_nc1(part: Part) -> str:
         f"  {part.name}",
         f"  {part.grade}",
         f"  {part.qty}",
-        f"  PL{thk:g}" if thk else "  PL",
+        f"  PL{thk:g}",
         "  B",
         f(part.length),
         f(part.width),

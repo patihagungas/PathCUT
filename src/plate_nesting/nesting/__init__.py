@@ -8,10 +8,14 @@ from plate_nesting.models.part import Part
 from plate_nesting.models.sheet import Sheet
 
 
+from collections.abc import Callable
+
+
 def nest(
     parts: list[Part],
     sheets: list[Sheet],
     options: NestOptions | None = None,
+    on_progress: Callable[[str], None] | None = None,
 ) -> list[Layout]:
     """Nest parts onto sheets using the engine specified in options.
 
@@ -19,6 +23,7 @@ def nest(
         parts: Parts to nest (qty field is respected).
         sheets: Available sheet sizes.
         options: Nesting options. Defaults to TrueShape engine.
+        on_progress: Optional callback for progress updates.
 
     Returns:
         One Layout per sheet used.
@@ -35,4 +40,4 @@ def nest(
 
         engine = TrueShapeEngine(time_budget=options.time_budget)
 
-    return engine.nest(parts, sheets, options)
+    return engine.nest(parts, sheets, options, on_progress=on_progress)
