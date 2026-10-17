@@ -24,9 +24,15 @@ web = [
     "fastapi>=0.110",
     "uvicorn>=0.30",
 ]
+gui = [
+    "PySide6>=6.6",
+]
 
 [project.scripts]
 plate-nesting = "plate_nesting.cli.main:main"
+
+[project.gui-scripts]
+pathcut = "plate_nesting.gui.app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/plate_nesting"]
