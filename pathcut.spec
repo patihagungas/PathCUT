@@ -11,7 +11,7 @@ a = Analysis(
     ["src/plate_nesting/gui/app.py"],
     pathex=["src"],
     binaries=[],
-    datas=ezdxf_datas,
+    datas=ezdxf_datas + [("pathcut.ico", ".")],
     hiddenimports=collect_submodules("plate_nesting"),
     hookspath=[],
     hooksconfig={},
@@ -34,6 +34,7 @@ exe = EXE(
     upx=True,
     console=False,          # windowed app — no terminal
     disable_windowed_traceback=False,
+    icon="pathcut.ico",
 )
 
 coll = COLLECT(

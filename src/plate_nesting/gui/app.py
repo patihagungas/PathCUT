@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -99,6 +100,11 @@ def _apply_dark_theme(app: QApplication) -> None:
 def main() -> None:
     app = QApplication(sys.argv)
     _apply_dark_theme(app)
+    # Set app icon — check PyInstaller bundle dir first, then source tree
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent.parent.parent))
+    ico = base / "pathcut.ico"
+    if ico.exists():
+        app.setWindowIcon(QIcon(str(ico)))
     window = PathCutApp()
     window.show()
     sys.exit(app.exec())

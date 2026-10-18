@@ -14,12 +14,14 @@ SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+SetupIconFile=pathcut.ico
+UninstallDisplayIcon={app}\PathCUT.exe
 
 [Files]
 Source: "dist\PathCUT\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\PathCUT"; Filename: "{app}\PathCUT.exe"
+Name: "{group}\PathCUT"; Filename: "{app}\PathCUT.exe"; IconFilename: "{app}\PathCUT.exe"
 Name: "{group}\Uninstall PathCUT"; Filename: "{uninstallexe}"
 Name: "{commondesktop}\PathCUT"; Filename: "{app}\PathCUT.exe"; Tasks: desktopicon
 
