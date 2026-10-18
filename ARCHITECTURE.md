@@ -1,11 +1,14 @@
-# Architecture
+# Architecture — PathCUT
 
 ## Package layout
 
 ```
 src/plate_nesting/
-├── models/          Part, Sheet, Layout, Order dataclasses
-│   └── part.py      Central Part model used by all modules
+├── gui/             PySide6 desktop application
+│   ├── app.py       Main window, dark Fusion theme, entry point
+│   └── converter.py Convert tab UI (settings ribbon, file table, conversion)
+├── models/          Part dataclass (central model used by all modules)
+│   └── part.py      Central Part model
 ├── geometry/        Seg class, contour operations, area/perimeter
 │   ├── seg.py       Line/arc segment
 │   ├── contour.py   chain, orient, start_at_left, bbox
@@ -16,22 +19,20 @@ src/plate_nesting/
 │   └── _format.py   Shared constants and formatting helpers
 ├── dxf/             DXF file I/O (via ezdxf)
 │   ├── reader.py    DXF → Part
-│   └── writer.py    Part → DXF (Phase 6)
-├── nesting/         Nesting engines and orchestrator
-│   ├── __init__.py  nest() dispatcher (routes by EngineType)
-│   ├── maxrects.py  MaxRects BSSF bin packing engine
-│   ├── trueshape.py spyrrow-based true-shape strip packer
-│   ├── partinpart.py Post-proc: fit parts inside cutouts
-│   ├── validator.py Independent Shapely layout validator
-│   └── job.py       Job orchestrator (group, nest, report)
-├── materials/       Sheet/remnant inventory
-│   └── inventory.py SheetInventory, Remnant, JSON persistence
-├── cutting/         Common cuts, cut path, G-code generation
-│   └── common_cut.py Detect shared collinear edges between parts
-├── orders/          CSV/folder import (Phase 7)
-├── reports/         XLSX/PDF reports (Phase 7)
+│   └── writer.py    Part → DXF
 ├── cli/main.py      CLI entry point
-└── web/             FastAPI + frontend (Phase 8)
+├── orders/          CSV/folder import (planned)
+├── reports/         XLSX/PDF reports (planned)
+└── web/             FastAPI + frontend (planned)
+```
+
+### Build / installer tooling (project root)
+
+```
+pathcut.spec         PyInstaller spec (onedir, windowed)
+installer.iss        Inno Setup 6 script
+build_installer.bat  One-click build: PyInstaller + Inno Setup
+generate_guide.py    Generates PathCUT_User_Guide.pdf
 ```
 
 ## Data flow

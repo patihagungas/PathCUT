@@ -36,36 +36,38 @@ def _add_seg(msp: ezdxf.entities.Modelspace, seg: Seg, layer: str) -> None:
     )
 
 
-def write_dxf(part: Part, path: str | Path) -> None:
-    """Write a Part to a DXF file.
-
-    Layers:
-        CUT (color 7/white) — outer contour + holes
-        CUTOUT (color 2/yellow) — inner contours
-        TEXT (color 3/green) — part info text
-    """
-    doc = ezdxf.new("R2010")
+def write_dxf(
+    part: Part,
+    path: str | Path,
+    *,
+    dxf_version: str = "R2010",
+    cut_layer: str = "CUT",
+    cutout_layer: str = "CUTOUT",
+    text_layer: str = "TEXT",
+) -> None:
+    """Write a Part to a DXF file."""
+    doc = ezdxf.new(dxf_version)
     msp = doc.modelspace()
 
-    doc.layers.add("CUT", color=7)
-    doc.layers.add("CUTOUT", color=2)
-    doc.layers.add("TEXT", color=3)
+    doc.layers.add(cut_layer, color=7)
+    doc.layers.add(cutout_layer, color=2)
+    doc.layers.add(text_layer, color=3)
 
     # Outer contour
     for seg in part.outer:
-        _add_seg(msp, seg, "CUT")
+        _add_seg(msp, seg, cut_layer)
 
     # Inner contours (cutouts)
     for inner in part.inners:
         for seg in inner:
-            _add_seg(msp, seg, "CUTOUT")
+            _add_seg(msp, seg, cutout_layer)
 
     # Holes
     for x, y, d in part.holes:
         msp.add_circle(
             center=(x, y),
             radius=d / 2,
-            dxfattribs={"layer": "CUT"},
+            dxfattribs={"layer": cut_layer},
         )
 
     # Info text above part bbox
@@ -76,7 +78,7 @@ def write_dxf(part: Part, path: str | Path) -> None:
         msp.add_mtext(
             text,
             dxfattribs={
-                "layer": "TEXT",
+                "layer": text_layer,
                 "insert": (0, y_max + 20),
             },
         )

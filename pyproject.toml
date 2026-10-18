@@ -5,13 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "plate-nesting"
 version = "0.1.0"
-description = "Steel plate nesting application with DXF/NC1 support"
+description = "DXF/NC1 file converter and viewer"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
     "ezdxf>=1.3",
-    "shapely>=2.0",
-    "spyrrow>=0.9",
 ]
 
 [project.optional-dependencies]

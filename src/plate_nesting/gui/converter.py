@@ -9,13 +9,17 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -26,17 +30,101 @@ from PySide6.QtWidgets import (
 if TYPE_CHECKING:
     from PySide6.QtGui import QDragEnterEvent, QDropEvent
 
-from plate_nesting.dxf.reader import read_dxf
+from plate_nesting.dxf.reader import DxfReadOptions, read_dxf
 from plate_nesting.dxf.writer import write_dxf
 from plate_nesting.models.part import Part
 from plate_nesting.nc1.parser import parse_nc1
 from plate_nesting.nc1.writer import write_nc1
 
 # Column indices
-COL_NUM, COL_FILE, COL_NAME, COL_SIZE, COL_QTY, COL_GRADE, COL_THK, COL_STATUS = range(8)
+COL_NUM, COL_FILE, COL_NAME, COL_L, COL_W, COL_QTY, COL_GRADE, COL_THK, COL_STATUS = range(9)
 
-# Columns editable in DXF → NC1 mode
-_EDITABLE_COLS = {COL_QTY, COL_GRADE, COL_THK}
+# Columns the user can edit (all meaningful fields)
+_EDITABLE_COLS = {COL_NAME, COL_L, COL_W, COL_QTY, COL_GRADE, COL_THK}
+
+
+class SettingsRibbon(QWidget):
+    """Ribbon bar with DXF layer names, defaults, and output settings."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # DXF Layers group
+        layers = QGroupBox("DXF Layers")
+        lg = QFormLayout()
+        self._cut_layer = QLineEdit("CUT")
+        self._cutout_layer = QLineEdit("CUTOUT")
+        self._text_layer = QLineEdit("TEXT")
+        self._scribe_layer = QLineEdit("SCRIBE")
+        lg.addRow("Cut:", self._cut_layer)
+        lg.addRow("Cutout:", self._cutout_layer)
+        lg.addRow("Text:", self._text_layer)
+        lg.addRow("Scribe:", self._scribe_layer)
+        layers.setLayout(lg)
+        layout.addWidget(layers)
+
+        # Defaults group
+        defaults = QGroupBox("Defaults")
+        dg = QFormLayout()
+        self._order = QLineEdit("W8753")
+        self._phase = QLineEdit("63")
+        self._max_hole = QDoubleSpinBox()
+        self._max_hole.setRange(0, 9999)
+        self._max_hole.setValue(40.0)
+        self._max_hole.setSuffix(" mm")
+        dg.addRow("Order:", self._order)
+        dg.addRow("Phase:", self._phase)
+        dg.addRow("Max hole:", self._max_hole)
+        defaults.setLayout(dg)
+        layout.addWidget(defaults)
+
+        # Output group
+        output = QGroupBox("Output")
+        og = QFormLayout()
+        self._dxf_ver = QComboBox()
+        self._dxf_ver.addItems(["R2010", "R2013", "R2018"])
+        self._encoding = QComboBox()
+        self._encoding.addItems(["UTF-8", "Latin-1"])
+        self._precision = QSpinBox()
+        self._precision.setRange(1, 6)
+        self._precision.setValue(2)
+        og.addRow("DXF Ver:", self._dxf_ver)
+        og.addRow("Encoding:", self._encoding)
+        og.addRow("Precision:", self._precision)
+        output.setLayout(og)
+        layout.addWidget(output)
+
+    def to_read_options(self) -> DxfReadOptions:
+        """Build DxfReadOptions from current ribbon values."""
+        return DxfReadOptions(
+            cut_layer=self._cut_layer.text().strip() or "CUT",
+            cutout_layer=self._cutout_layer.text().strip() or "CUTOUT",
+            text_layer=self._text_layer.text().strip() or "TEXT",
+            scribe_layer=self._scribe_layer.text().strip() or "SCRIBE",
+            max_hole=self._max_hole.value(),
+            order=self._order.text().strip() or "W8753",
+            phase=self._phase.text().strip(),
+        )
+
+    def dxf_version(self) -> str:
+        return self._dxf_ver.currentText()
+
+    def encoding(self) -> str:
+        return self._encoding.currentText().lower()
+
+    def precision(self) -> int:
+        return self._precision.value()
+
+    def cut_layer(self) -> str:
+        return self._cut_layer.text().strip() or "CUT"
+
+    def cutout_layer(self) -> str:
+        return self._cutout_layer.text().strip() or "CUTOUT"
+
+    def text_layer(self) -> str:
+        return self._text_layer.text().strip() or "TEXT"
 
 
 class ConvertTab(QWidget):
@@ -54,6 +142,10 @@ class ConvertTab(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
+
+        # Settings ribbon
+        self._ribbon = SettingsRibbon()
+        root.addWidget(self._ribbon)
 
         # Toolbar row
         toolbar = QHBoxLayout()
@@ -109,13 +201,13 @@ class ConvertTab(QWidget):
         root.addWidget(self._defaults_widget)
 
         # Table
-        self._table = QTableWidget(0, 8)
+        self._table = QTableWidget(0, 9)
         self._table.setHorizontalHeaderLabels(
-            ["#", "Input File", "Name", "L \u00d7 W", "Qty", "Grade", "Thk", "Status"]
+            ["#", "Input File", "Name", "L", "W", "Qty", "Grade", "Thk", "Status"]
         )
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(COL_FILE, QHeaderView.ResizeMode.Stretch)
         root.addWidget(self._table, stretch=1)
@@ -171,7 +263,7 @@ class ConvertTab(QWidget):
                 continue
             try:
                 if ext == ".dxf":
-                    part = read_dxf(fp)
+                    part = read_dxf(fp, opts=self._ribbon.to_read_options())
                 else:
                     part = parse_nc1(fp.read_text(encoding="utf-8", errors="replace"))
                 self._items.append((fp, part))
@@ -270,15 +362,26 @@ class ConvertTab(QWidget):
 
         for row, (src, part) in enumerate(self._items):
             dest_dir = out_dir or src.parent
-            dest = dest_dir / f"{part.name}{target_ext}"
             try:
+                # Sync user-edited values from table cells
+                self._apply_table_values_to_part(row, part)
+                dest = dest_dir / f"{part.name}{target_ext}"
                 if to_nc1:
-                    # Read user-edited values from table cells
-                    self._apply_table_values_to_part(row, part)
-                    text = write_nc1(part)
-                    dest.write_text(text, encoding="utf-8", newline="\r\n")
+                    text = write_nc1(part, precision=self._ribbon.precision())
+                    dest.write_text(
+                        text,
+                        encoding=self._ribbon.encoding(),
+                        newline="\r\n",
+                    )
                 else:
-                    write_dxf(part, dest)
+                    write_dxf(
+                        part,
+                        dest,
+                        dxf_version=self._ribbon.dxf_version(),
+                        cut_layer=self._ribbon.cut_layer(),
+                        cutout_layer=self._ribbon.cutout_layer(),
+                        text_layer=self._ribbon.text_layer(),
+                    )
 
                 self._set_status(row, "Done")
                 self._log_msg(f"OK: {src.name} -> {dest.name}")
@@ -296,7 +399,25 @@ class ConvertTab(QWidget):
             self._log_msg(f"All {len(self._items)} file(s) converted successfully.")
 
     def _apply_table_values_to_part(self, row: int, part: Part) -> None:
-        """Read Grade, Thk, Qty from editable table cells and update Part."""
+        """Read all editable table cells back into Part."""
+        name_item = self._table.item(row, COL_NAME)
+        if name_item and name_item.text().strip():
+            part.name = name_item.text().strip()
+
+        l_item = self._table.item(row, COL_L)
+        if l_item:
+            try:
+                part.length = float(l_item.text().strip())
+            except ValueError:
+                pass
+
+        w_item = self._table.item(row, COL_W)
+        if w_item:
+            try:
+                part.width = float(w_item.text().strip())
+            except ValueError:
+                pass
+
         grade_item = self._table.item(row, COL_GRADE)
         if grade_item:
             part.grade = grade_item.text().strip()
@@ -320,7 +441,6 @@ class ConvertTab(QWidget):
     # ---- table ----
 
     def _refresh_table(self) -> None:
-        editable = self._is_dxf_to_nc1()
         default_grade = self._default_grade.text().strip()
         default_thk = self._default_thk.text().strip()
 
@@ -329,10 +449,8 @@ class ConvertTab(QWidget):
             self._table.setItem(i, COL_NUM, QTableWidgetItem(str(i + 1)))
             self._table.setItem(i, COL_FILE, QTableWidgetItem(fp.name))
             self._table.setItem(i, COL_NAME, QTableWidgetItem(part.name))
-            self._table.setItem(
-                i, COL_SIZE,
-                QTableWidgetItem(f"{part.length:.0f} \u00d7 {part.width:.0f}"),
-            )
+            self._table.setItem(i, COL_L, QTableWidgetItem(f"{part.length:.0f}"))
+            self._table.setItem(i, COL_W, QTableWidgetItem(f"{part.width:.0f}"))
             self._table.setItem(i, COL_QTY, QTableWidgetItem(str(part.qty)))
 
             # Grade: use part value if set, else fall back to default
@@ -349,11 +467,11 @@ class ConvertTab(QWidget):
             self._table.setItem(i, COL_STATUS, QTableWidgetItem(""))
 
             # Set cell editability
-            for col in range(8):
+            for col in range(9):
                 item = self._table.item(i, col)
                 if item is None:
                     continue
-                if editable and col in _EDITABLE_COLS:
+                if col in _EDITABLE_COLS:
                     item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
                 else:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
